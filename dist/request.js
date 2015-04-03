@@ -40,9 +40,9 @@ __tetanize_define('index.js', function (exports, module) {
   /* Void callback */
   
   var noop = function () {};
-  var handlers = [];
   var request = module.exports = {};
   
+  settings.handlers = [];
   
   request.setup = function (url, callback, options, method) {
     options = options || {};
@@ -98,8 +98,8 @@ __tetanize_define('index.js', function (exports, module) {
    */
   
   request.use = function (handler) {
-    if (handlers.indexOf(handler) === -1)
-      handlers.push(handler);
+    if (settings.handlers.indexOf(handler) === -1)
+      settings.handlers.push(handler);
   };
   
   /*
@@ -138,6 +138,54 @@ __tetanize_define('index.js', function (exports, module) {
   
   request.errors = errors;
   
+
+});
+__tetanize_define('lib/errors.js', function (exports, module) { 
+  'use strict';
+  
+  var errors = module.exports = {};
+  
+  var RequestError = function(name, infos) {
+      this.name = name;
+      this.infos = infos || {};
+  }
+  
+  RequestError.prototype = new Error();
+  
+  RequestError.prototype.toString = function () {
+      var infos = this.infos;
+      var infosLine = Object.keys(infos).map(function (name) {
+          return name + '=' + infos[name];
+      }).join(';');
+  
+  
+      return this.name + (infosLine.length > 0 ? ' : ' + infosLine : '');
+  };
+  
+  RequestError.extend = function () {
+      var args = Array.prototype.slice.call(arguments);
+      var ErrorChild = function () {
+          var childArgs = Array.prototype.slice.call(arguments);
+          var name = args[0];
+          var index = 1;
+          var infos = {};
+  
+          for (index = 1; index < args.length; index++) {
+              if (index - 1 < childArgs.length) {
+                  infos[args[index]] = childArgs[index - 1];
+              }
+          }
+  
+          RequestError.apply(this, [name, infos]);
+      }
+  
+      ErrorChild.prototype = new RequestError();
+      return ErrorChild;
+  };
+  
+  
+  errors.TimeoutError = RequestError.extend('TimeoutError', 'timeout');
+  errors.NoNetworkError = RequestError.extend('NoNetworkError');
 
 });
 __tetanize_define('lib/inproxy.js', function (exports, module) { 
@@ -205,54 +253,6 @@ __tetanize_define('lib/settings.js', function (exports, module) {
   
   settings.loglevel = 1;
   settings.timeout = 10000;
-
-});
-__tetanize_define('lib/errors.js', function (exports, module) { 
-  'use strict';
-  
-  var errors = module.exports = {};
-  
-  var RequestError = function(name, infos) {
-      this.name = name;
-      this.infos = infos || {};
-  }
-  
-  RequestError.prototype = new Error();
-  
-  RequestError.prototype.toString = function () {
-      var infos = this.infos;
-      var infosLine = Object.keys(infos).map(function (name) {
-          return name + '=' + infos[name];
-      }).join(';');
-  
-  
-      return this.name + (infosLine.length > 0 ? ' : ' + infosLine : '');
-  };
-  
-  RequestError.extend = function () {
-      var args = Array.prototype.slice.call(arguments);
-      var ErrorChild = function () {
-          var childArgs = Array.prototype.slice.call(arguments);
-          var name = args[0];
-          var index = 1;
-          var infos = {};
-  
-          for (index = 1; index < args.length; index++) {
-              if (index - 1 < childArgs.length) {
-                  infos[args[index]] = childArgs[index - 1];
-              }
-          }
-  
-          RequestError.apply(this, [name, infos]);
-      }
-  
-      ErrorChild.prototype = new RequestError();
-      return ErrorChild;
-  };
-  
-  
-  errors.TimeoutError = RequestError.extend('TimeoutError', 'timeout');
-  errors.NoNetworkError = RequestError.extend('NoNetworkError');
 
 });
 __tetanize_define('lib/client.js', function (exports, module) { 
@@ -483,114 +483,6 @@ __tetanize_define('lib/client.js', function (exports, module) {
   
 
 });
-__tetanize_define('node_modules/bindall-standalone/index.js', function (exports, module) { 
-  'use strict';
-  
-  var toString = Object.prototype.toString,
-      hasOwnProperty = Object.prototype.hasOwnProperty;
-  
-  module.exports = function(object) {
-      if(!object) return console.warn('bindAll requires at least one argument.');
-  
-      var functions = Array.prototype.slice.call(arguments, 1);
-  
-      if (functions.length === 0) {
-  
-          for (var method in object) {
-              if(hasOwnProperty.call(object, method)) {
-                  if(typeof object[method] == 'function' && toString.call(object[method]) == "[object Function]") {
-                      functions.push(method);
-                  }
-              }
-          }
-      }
-  
-      for(var i = 0; i < functions.length; i++) {
-          var f = functions[i];
-          object[f] = bind(object[f], object);
-      }
-  };
-  
-  /*
-      Faster bind without specific-case checking. (see https://coderwall.com/p/oi3j3w).
-      bindAll is only needed for events binding so no need to make slow fixes for constructor
-      or partial application.
-  */
-  function bind(func, context) {
-    return function() {
-      return func.apply(context, arguments);
-    };
-  }
-
-});
-__tetanize_define('node_modules/query-string/query-string.js', function (exports, module) { 
-  /*!
-  	query-string
-  	Parse and stringify URL query strings
-  	https://github.com/sindresorhus/query-string
-  	by Sindre Sorhus
-  	MIT License
-  */
-  (function () {
-  	'use strict';
-  	var queryString = {};
-  
-  	queryString.parse = function (str) {
-  		if (typeof str !== 'string') {
-  			return {};
-  		}
-  
-  		str = str.trim().replace(/^\?/, '');
-  
-  		if (!str) {
-  			return {};
-  		}
-  
-  		return str.trim().split('&').reduce(function (ret, param) {
-  			var parts = param.replace(/\+/g, ' ').split('=');
-  			var key = parts[0];
-  			var val = parts[1];
-  
-  			key = decodeURIComponent(key);
-  			// missing `=` should be `null`:
-  			// http://w3.org/TR/2012/WD-url-20120524/#collect-url-parameters
-  			val = val === undefined ? null : decodeURIComponent(val);
-  
-  			if (!ret.hasOwnProperty(key)) {
-  				ret[key] = val;
-  			} else if (Array.isArray(ret[key])) {
-  				ret[key].push(val);
-  			} else {
-  				ret[key] = [ret[key], val];
-  			}
-  
-  			return ret;
-  		}, {});
-  	};
-  
-  	queryString.stringify = function (obj) {
-  		return obj ? Object.keys(obj).map(function (key) {
-  			var val = obj[key];
-  
-  			if (Array.isArray(val)) {
-  				return val.map(function (val2) {
-  					return encodeURIComponent(key) + '=' + encodeURIComponent(val2);
-  				}).join('&');
-  			}
-  
-  			return encodeURIComponent(key) + '=' + encodeURIComponent(val);
-  		}).join('&') : '';
-  	};
-  
-  	if (typeof module !== 'undefined' && module.exports) {
-  		module.exports = queryString;
-  	} else {
-  		window.queryString = queryString;
-  	}
-  })();
-  
-
-});
 __tetanize_define('node_modules/extend/index.js', function (exports, module) { 
   var hasOwn = Object.prototype.hasOwnProperty;
   var toString = Object.prototype.toString;
@@ -671,6 +563,166 @@ __tetanize_define('node_modules/extend/index.js', function (exports, module) {
   	return target;
   };
   
+
+});
+__tetanize_define('node_modules/query-string/query-string.js', function (exports, module) { 
+  /*!
+  	query-string
+  	Parse and stringify URL query strings
+  	https://github.com/sindresorhus/query-string
+  	by Sindre Sorhus
+  	MIT License
+  */
+  (function () {
+  	'use strict';
+  	var queryString = {};
+  
+  	queryString.parse = function (str) {
+  		if (typeof str !== 'string') {
+  			return {};
+  		}
+  
+  		str = str.trim().replace(/^\?/, '');
+  
+  		if (!str) {
+  			return {};
+  		}
+  
+  		return str.trim().split('&').reduce(function (ret, param) {
+  			var parts = param.replace(/\+/g, ' ').split('=');
+  			var key = parts[0];
+  			var val = parts[1];
+  
+  			key = decodeURIComponent(key);
+  			// missing `=` should be `null`:
+  			// http://w3.org/TR/2012/WD-url-20120524/#collect-url-parameters
+  			val = val === undefined ? null : decodeURIComponent(val);
+  
+  			if (!ret.hasOwnProperty(key)) {
+  				ret[key] = val;
+  			} else if (Array.isArray(ret[key])) {
+  				ret[key].push(val);
+  			} else {
+  				ret[key] = [ret[key], val];
+  			}
+  
+  			return ret;
+  		}, {});
+  	};
+  
+  	queryString.stringify = function (obj) {
+  		return obj ? Object.keys(obj).map(function (key) {
+  			var val = obj[key];
+  
+  			if (Array.isArray(val)) {
+  				return val.map(function (val2) {
+  					return encodeURIComponent(key) + '=' + encodeURIComponent(val2);
+  				}).join('&');
+  			}
+  
+  			return encodeURIComponent(key) + '=' + encodeURIComponent(val);
+  		}).join('&') : '';
+  	};
+  
+  	if (typeof module !== 'undefined' && module.exports) {
+  		module.exports = queryString;
+  	} else {
+  		window.queryString = queryString;
+  	}
+  })();
+  
+
+});
+__tetanize_define('node_modules/bindall-standalone/index.js', function (exports, module) { 
+  'use strict';
+  
+  var toString = Object.prototype.toString,
+      hasOwnProperty = Object.prototype.hasOwnProperty;
+  
+  module.exports = function(object) {
+      if(!object) return console.warn('bindAll requires at least one argument.');
+  
+      var functions = Array.prototype.slice.call(arguments, 1);
+  
+      if (functions.length === 0) {
+  
+          for (var method in object) {
+              if(hasOwnProperty.call(object, method)) {
+                  if(typeof object[method] == 'function' && toString.call(object[method]) == "[object Function]") {
+                      functions.push(method);
+                  }
+              }
+          }
+      }
+  
+      for(var i = 0; i < functions.length; i++) {
+          var f = functions[i];
+          object[f] = bind(object[f], object);
+      }
+  };
+  
+  /*
+      Faster bind without specific-case checking. (see https://coderwall.com/p/oi3j3w).
+      bindAll is only needed for events binding so no need to make slow fixes for constructor
+      or partial application.
+  */
+  function bind(func, context) {
+    return function() {
+      return func.apply(context, arguments);
+    };
+  }
+
+});
+__tetanize_define('lib/middleware/retry.js', function (exports, module) { 
+  'use strict';
+  
+  /*
+   * Dependencies 
+   */
+  
+  
+  var client = __tetanize_require('lib/client.js');
+  var extend = __tetanize_require('node_modules/extend/index.js');
+  var TimeoutError = __tetanize_require('lib/errors.js').TimeoutError;
+  
+  /*
+   * Defaults middleware settings
+   */
+  
+  var retryDefaults = {
+      multiplier: 1,
+      maxTryouts: 3
+  };
+  
+  /* If TimeoutError is received,
+   * increase previous timeout and call a new request
+   */
+  
+  function parseResponse(config, req, res, err) {
+      if (! (err instanceof TimeoutError)) return;
+  
+      req.tryout = req.tryout || 1;
+      if (req.tryout >= config.maxTryouts) return;
+  
+      req.tryout++;
+      req.timeout = req.timeout * config.multiplier;
+      client(req).call();
+      return false;
+  };
+  
+  /*
+   * Generate the retry middleware
+   */
+  
+  module.exports = function createMiddleware(opts) {
+      var config = extend({}, retryDefaults, opts || {});
+  
+      return function retryMiddleware(req, res, err) {
+          if (!!res) {
+              return parseResponse(config, req, res, err);
+          }
+      };
+  };
 
 });
 __tetanize_define('lib/middleware/cookie.js', function (exports, module) { 
@@ -773,58 +825,6 @@ __tetanize_define('lib/middleware/cookie.js', function (exports, module) {
               parseResponseHeaders(req, res);
           } else {
               extendRequestHeaders(req, res);
-          }
-      };
-  };
-
-});
-__tetanize_define('lib/middleware/retry.js', function (exports, module) { 
-  'use strict';
-  
-  /*
-   * Dependencies 
-   */
-  
-  
-  var client = __tetanize_require('lib/client.js');
-  var extend = __tetanize_require('node_modules/extend/index.js');
-  var TimeoutError = __tetanize_require('lib/errors.js').TimeoutError;
-  
-  /*
-   * Defaults middleware settings
-   */
-  
-  var retryDefaults = {
-      multiplier: 1,
-      maxTryouts: 3
-  };
-  
-  /* If TimeoutError is received,
-   * increase previous timeout and call a new request
-   */
-  
-  function parseResponse(config, req, res, err) {
-      if (! (err instanceof TimeoutError)) return;
-  
-      req.tryout = req.tryout || 1;
-      if (req.tryout >= config.maxTryouts) return;
-  
-      req.tryout++;
-      req.timeout = req.timeout * config.multiplier;
-      client(req).call();
-      return false;
-  };
-  
-  /*
-   * Generate the retry middleware
-   */
-  
-  module.exports = function createMiddleware(opts) {
-      var config = extend({}, retryDefaults, opts || {});
-  
-      return function retryMiddleware(req, res, err) {
-          if (!!res) {
-              return parseResponse(config, req, res, err);
           }
       };
   };

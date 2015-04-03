@@ -15,9 +15,9 @@ var middlewares = {
 /* Void callback */
 
 var noop = function () {};
-var handlers = [];
 var request = module.exports = {};
 
+settings.handlers = [];
 
 request.setup = function (url, callback, options, method) {
   options = options || {};
@@ -73,8 +73,8 @@ request.delete = function (url, callback, options) {
  */
 
 request.use = function (handler) {
-  if (handlers.indexOf(handler) === -1)
-    handlers.push(handler);
+  if (settings.handlers.indexOf(handler) === -1)
+    settings.handlers.push(handler);
 };
 
 /*
